@@ -99,7 +99,12 @@ namespace DiscordReactionBot
             var message = await cachedMessage.GetOrDownloadAsync();
             if (message != null && message.Author != null && !message.Author.IsBot)
             {
-                var channel = message.Channel ?? await cachedChannel.GetOrDownloadAsync();
+                IMessageChannel? channel = message.Channel;
+                if (channel == null)
+                {
+                    channel = await cachedChannel.GetOrDownloadAsync();
+                }
+
                 record = new Models.DeletedMessageRecord
                 {
                     Content = message.Content ?? string.Empty,

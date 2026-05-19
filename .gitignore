@@ -68,3 +68,6 @@ node_modules/
 
 # config folders
 config/
+
+# zip
+*.zip

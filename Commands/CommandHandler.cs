@@ -34,7 +34,7 @@ namespace DiscordReactionBot.Commands
 
             if (cmd != "ping" && !(isAdmin || isAllowed))
             {
-                await ReplyAsync(msg, "You are not allowed to use bot commands.");
+                await ReplyAsync(msg, "holy no perms, you can't use this command.");
                 return;
             }
 
@@ -86,14 +86,14 @@ namespace DiscordReactionBot.Commands
             }
         }
 
-        private Task ReplyAsync(SocketMessage original, string content, string title = "Discord Reaction Bot", Color? color = null)
+        private Task ReplyAsync(SocketMessage original, string content, string title = "Annyoing ahh", Color? color = null)
         {
             var embed = new EmbedBuilder()
                 .WithTitle(title)
                 .WithDescription(content)
                 .WithColor(color ?? Color.DarkBlue)
                 .WithCurrentTimestamp()
-                .WithFooter(footer => footer.Text = "Use ?help for bot commands")
+                .WithFooter(footer => footer.Text = "Annyoing ahh — use ?help for bot commands")
                 .Build();
 
             return original.Channel.SendMessageAsync(embed: embed, messageReference: new MessageReference(original.Id));
@@ -227,16 +227,16 @@ namespace DiscordReactionBot.Commands
         private async Task HandleHelp(SocketMessage msg)
         {
             var embed = new EmbedBuilder()
-                .WithTitle("Bot Command Reference")
+                .WithTitle("Annyoing ahh Command Help")
                 .WithColor(Color.Gold)
-                .WithDescription("Use the `?` prefix for all bot commands. Admin-only commands require the configured admin user.")
+                .WithDescription("Use the `?` prefix for all bot commands. Admin only commands require the configured admin user.")
                 .AddField("Reaction Rules", "`?react <emoji(s) OR preset>`\n`?react @user <emoji(s) OR preset>`\n`?react off`", true)
                 .AddField("Presets", "`?preset add <name> <emoji(s)>`\n`?preset remove <name>`\n`?preset lis`", true)
-                .AddField("Utility", "`?ping`\n`?help`\n`?snipe [number]`\n`?snipe clear`", false)
+                .AddField("Utility", "`?ping`\n`?help`\n`?snipe [number]`\n`?snipe clear` (admin only)", false)
                 .AddField("User Management", "`?allow @user`\n`?remove @user`\n`?block @user`\n`?unblock @user`", false)
                 .AddField("Safety", "`?blockword <word1> <word2> ...`", false)
                 .WithCurrentTimestamp()
-                .WithFooter(footer => footer.Text = "React bot help");
+                .WithFooter(footer => footer.Text = "Annyoing ahh help");
 
             await msg.Channel.SendMessageAsync(embed: embed.Build(), messageReference: new MessageReference(msg.Id));
         }
@@ -252,16 +252,22 @@ namespace DiscordReactionBot.Commands
                 }
 
                 var latestDeleted = _storage.DeletedMessages[0];
-                await ReplyAsync(msg, FormatDeletedMessage(latestDeleted, 1));
+                await ReplyWithDeletedMessageAsync(msg, latestDeleted, 1);
                 return;
             }
 
             var option = parts[1].ToLowerInvariant();
             if (option == "clear")
             {
+                if (msg.Author.Id != _storage.Config.AdminId)
+                {
+                    await ReplyAsync(msg, "this aint allowed by anyone dummy", color: Color.Red);
+                    return;
+                }
+
                 _storage.DeletedMessages.Clear();
                 _storage.SaveDeletedMessages();
-                await ReplyAsync(msg, "Deleted message history cleared.");
+                await ReplyAsync(msg, "cleared message history");
                 return;
             }
 
@@ -302,7 +308,7 @@ namespace DiscordReactionBot.Commands
             // only admin
             if (msg.Author.Id != _storage.Config.AdminId)
             {
-                await ReplyAsync(msg, "Only admin can add allowed users.");
+                await ReplyAsync(msg, "ur to dumb to allow people");
                 return;
             }
             var mentioned = msg.MentionedUsers.FirstOrDefault();
@@ -325,7 +331,7 @@ namespace DiscordReactionBot.Commands
             // only admin
             if (msg.Author.Id != _storage.Config.AdminId)
             {
-                await ReplyAsync(msg, "Only admin can remove allowed users.");
+                await ReplyAsync(msg, "holy dumb ahh only admin can remove allowed users");
                 return;
             }
             var mentioned = msg.MentionedUsers.FirstOrDefault();
@@ -336,7 +342,7 @@ namespace DiscordReactionBot.Commands
             }
             if (mentioned.Id == _storage.Config.AdminId)
             {
-                await ReplyAsync(msg, "Cannot remove admin from allowed list.");
+                await ReplyAsync(msg, "can't unallow the admin dummy");
                 return;
             }
             if (_storage.Allowed.Remove(mentioned.Id))
@@ -351,7 +357,7 @@ namespace DiscordReactionBot.Commands
         {
             if (msg.Author.Id != _storage.Config.AdminId && !_storage.Allowed.Contains(msg.Author.Id))
             {
-                await ReplyAsync(msg, "You do not have permission to block users.");
+                await ReplyAsync(msg, "holy no perms");
                 return;
             }
             var mentioned = msg.MentionedUsers.FirstOrDefault();
@@ -373,7 +379,7 @@ namespace DiscordReactionBot.Commands
         {
             if (msg.Author.Id != _storage.Config.AdminId && !_storage.Allowed.Contains(msg.Author.Id))
             {
-                await ReplyAsync(msg, "You do not have permission to unblock users.");
+                await ReplyAsync(msg, "holy no perms");
                 return;
             }
             var mentioned = msg.MentionedUsers.FirstOrDefault();
