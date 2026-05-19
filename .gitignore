@@ -1,0 +1,67 @@
+# Build Folders
+/bin/
+/obj/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider files
+.idea/
+*.sln.iml
+
+# ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+# User-specific files
+*.userprefs
+
+# Mono auto generated files
+*.pidb
+*.svd
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+
+# Visual Studio cache files
+*.cache
+
+# Publish Output
+publish/
+
+# Local config and secrets
+config/*.json
+!config/botconfig.json
+!config/allowed.json
+!config/blocked.json
+!config/presets.json
+!config/reactions.json
+
+# Logs
+*.log
+
+# Generated runtime files
+*.runtimeconfig.json
+*.deps.json
+*.dll
+*.exe
+*.db
+
+# dotnet tool cache
+.project.assets.json
+
+# JetBrains Rider cache
+.idea/
+*.sln.iml
+
+# Optional npm cache files
+node_modules/

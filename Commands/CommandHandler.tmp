@@ -25,7 +25,6 @@ namespace DiscordReactionBot.Commands
             if (parts.Length == 0) return;
 
             var cmd = parts[0].Substring(1).ToLowerInvariant(); // remove prefix
-            if (string.IsNullOrWhiteSpace(cmd)) return;
 
             // permission check for commands (except ping)
             var isAdmin = msg.Author.Id == _storage.Config.AdminId;
@@ -41,10 +40,6 @@ namespace DiscordReactionBot.Commands
             {
                 case "ping":
                     await ReplyAsync(msg, $"pong {_client.Latency}ms");
-                    break;
-
-                case "help":
-                    await HandleHelp(msg);
                     break;
 
                 case "react":
@@ -151,7 +146,7 @@ namespace DiscordReactionBot.Commands
         {
             if (parts.Length < 2)
             {
-                await ReplyAsync(msg, "Usage: ?preset add <name> <emojis> | ?preset remove <name> | ?preset lis");
+                await ReplyAsync(msg, "Usage: ?preset add <name> <emojis> | ?preset remove <name>");
                 return;
             }
             var op = parts[1].ToLowerInvariant();
@@ -187,43 +182,6 @@ namespace DiscordReactionBot.Commands
                 }
                 else await ReplyAsync(msg, $"Preset '{name}' not found.");
             }
-            else if (op == "lis" || op == "list")
-            {
-                if (!_storage.Presets.Any())
-                {
-                    await ReplyAsync(msg, "No presets saved.");
-                    return;
-                }
-
-                var lines = _storage.Presets
-                    .Select(p => $"{p.Name} - {string.Join(' ', p.Emojis)}")
-                    .ToList();
-                var message = "Presets:\n" + string.Join("\n", lines);
-                await ReplyAsync(msg, message);
-            }
-            else
-            {
-                await ReplyAsync(msg, "Usage: ?preset add <name> <emojis> | ?preset remove <name> | ?preset lis");
-            }
-        }
-
-        private async Task HandleHelp(SocketMessage msg)
-        {
-            var helpText =
-                "Commands:\n" +
-                "?ping - reply with gateway latency.\n" +
-                "?help - show this help message.\n" +
-                "?react <emoji(s) OR preset> - set global reaction rule.\n" +
-                "?react @user <emoji(s) OR preset> - set user-specific reaction rule.\n" +
-                "?react off - disable reactions and clear active rules.\n" +
-                "?preset add <name> <emoji(s)> - save a preset.\n" +
-                "?preset remove <name> - delete a preset.\n" +
-                "?preset lis - list all saved presets and contents.\n" +
-                "?allow @user - allow a user to use bot commands (admin only).\n" +
-                "?remove @user - remove a user from allowed list (admin only).\n" +
-                "?block @user - add a user to the blocked list.\n" +
-                "?unblock @user - remove a user from the blocked list.";
-            await ReplyAsync(msg, helpText);
         }
 
         private async Task HandleAllow(SocketMessage msg)
