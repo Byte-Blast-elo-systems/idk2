@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Discord;
@@ -71,15 +72,31 @@ namespace DiscordReactionBot.Commands
                     await HandleUnblock(msg);
                     break;
 
+                case "blockword":
+                    await HandleBlockWord(msg, parts);
+                    break;
+
+                case "snipe":
+                    await HandleSnipe(msg, parts);
+                    break;
+
                 default:
                     // unknown
                     break;
             }
         }
 
-        private Task ReplyAsync(SocketMessage original, string content)
+        private Task ReplyAsync(SocketMessage original, string content, string title = "Discord Reaction Bot", Color? color = null)
         {
-            return original.Channel.SendMessageAsync(content, false, null, null, null, new MessageReference(original.Id));
+            var embed = new EmbedBuilder()
+                .WithTitle(title)
+                .WithDescription(content)
+                .WithColor(color ?? Color.DarkBlue)
+                .WithCurrentTimestamp()
+                .WithFooter(footer => footer.Text = "Use ?help for bot commands")
+                .Build();
+
+            return original.Channel.SendMessageAsync(embed: embed, messageReference: new MessageReference(original.Id));
         }
 
         private async Task HandleReact(SocketMessage msg, string[] parts)
@@ -209,21 +226,75 @@ namespace DiscordReactionBot.Commands
 
         private async Task HandleHelp(SocketMessage msg)
         {
-            var helpText =
-                "Commands:\n" +
-                "?ping - reply with gateway latency.\n" +
-                "?help - show this help message.\n" +
-                "?react <emoji(s) OR preset> - set global reaction rule.\n" +
-                "?react @user <emoji(s) OR preset> - set user-specific reaction rule.\n" +
-                "?react off - disable reactions and clear active rules.\n" +
-                "?preset add <name> <emoji(s)> - save a preset.\n" +
-                "?preset remove <name> - delete a preset.\n" +
-                "?preset lis - list all saved presets and contents.\n" +
-                "?allow @user - allow a user to use bot commands (admin only).\n" +
-                "?remove @user - remove a user from allowed list (admin only).\n" +
-                "?block @user - add a user to the blocked list.\n" +
-                "?unblock @user - remove a user from the blocked list.";
-            await ReplyAsync(msg, helpText);
+            var embed = new EmbedBuilder()
+                .WithTitle("Bot Command Reference")
+                .WithColor(Color.Gold)
+                .WithDescription("Use the `?` prefix for all bot commands. Admin-only commands require the configured admin user.")
+                .AddField("Reaction Rules", "`?react <emoji(s) OR preset>`\n`?react @user <emoji(s) OR preset>`\n`?react off`", true)
+                .AddField("Presets", "`?preset add <name> <emoji(s)>`\n`?preset remove <name>`\n`?preset lis`", true)
+                .AddField("Utility", "`?ping`\n`?help`\n`?snipe [number]`\n`?snipe clear`", false)
+                .AddField("User Management", "`?allow @user`\n`?remove @user`\n`?block @user`\n`?unblock @user`", false)
+                .AddField("Safety", "`?blockword <word1> <word2> ...`", false)
+                .WithCurrentTimestamp()
+                .WithFooter(footer => footer.Text = "React bot help");
+
+            await msg.Channel.SendMessageAsync(embed: embed.Build(), messageReference: new MessageReference(msg.Id));
+        }
+
+        private async Task HandleSnipe(SocketMessage msg, string[] parts)
+        {
+            if (parts.Length == 1)
+            {
+                if (!_storage.DeletedMessages.Any())
+                {
+                    await ReplyAsync(msg, "No deleted messages available.");
+                    return;
+                }
+
+                var latestDeleted = _storage.DeletedMessages[0];
+                await ReplyAsync(msg, FormatDeletedMessage(latestDeleted, 1));
+                return;
+            }
+
+            var option = parts[1].ToLowerInvariant();
+            if (option == "clear")
+            {
+                _storage.DeletedMessages.Clear();
+                _storage.SaveDeletedMessages();
+                await ReplyAsync(msg, "Deleted message history cleared.");
+                return;
+            }
+
+            if (!int.TryParse(option, out var index) || index < 1)
+            {
+                await ReplyAsync(msg, "Usage: ?snipe [number] | ?snipe clear");
+                return;
+            }
+
+            if (index > _storage.DeletedMessages.Count)
+            {
+                await ReplyAsync(msg, $"Only {_storage.DeletedMessages.Count} deleted messages are saved.", "Snipe Error", Color.Red);
+                return;
+            }
+
+            var selectedDeleted = _storage.DeletedMessages[index - 1];
+            await ReplyWithDeletedMessageAsync(msg, selectedDeleted, index);
+        }
+
+        private Task ReplyWithDeletedMessageAsync(SocketMessage original, Models.DeletedMessageRecord record, int index)
+        {
+            var channelName = string.IsNullOrWhiteSpace(record.ChannelName) ? record.ChannelId.ToString() : record.ChannelName;
+            var embed = new EmbedBuilder()
+                .WithTitle($"Deleted Message #{index}")
+                .WithColor(Color.Orange)
+                .WithDescription(string.IsNullOrWhiteSpace(record.Content) ? "(empty message)" : record.Content)
+                .AddField("Author", record.AuthorTag, true)
+                .AddField("Channel", channelName, true)
+                .AddField("Deleted At", record.DeletedAt.ToString("u"), false)
+                .WithCurrentTimestamp()
+                .WithFooter(footer => footer.Text = "Use ?snipe clear to clear history");
+
+            return original.Channel.SendMessageAsync(embed: embed.Build(), messageReference: new MessageReference(original.Id));
         }
 
         private async Task HandleAllow(SocketMessage msg)
@@ -317,6 +388,46 @@ namespace DiscordReactionBot.Commands
                 await ReplyAsync(msg, $"Unblocked <@{mentioned.Id}>.");
             }
             else await ReplyAsync(msg, "User was not blocked.");
+        }
+
+        private async Task HandleBlockWord(SocketMessage msg, string[] parts)
+        {
+            if (parts.Length < 2)
+            {
+                await ReplyAsync(msg, "Usage: ?blockword <word1> <word2> ...");
+                return;
+            }
+
+            var blockWords = parts.Skip(1)
+                .Where(w => !string.IsNullOrWhiteSpace(w))
+                .Select(w => w.Trim().ToLowerInvariant())
+                .Distinct()
+                .ToList();
+
+            if (!blockWords.Any())
+            {
+                await ReplyAsync(msg, "Usage: ?blockword <word1> <word2> ...");
+                return;
+            }
+
+            var addedWords = new List<string>();
+            foreach (var word in blockWords)
+            {
+                if (!_storage.BlockWords.Any(existing => existing.Equals(word, StringComparison.OrdinalIgnoreCase)))
+                {
+                    _storage.BlockWords.Add(word);
+                    addedWords.Add(word);
+                }
+            }
+
+            if (!addedWords.Any())
+            {
+                await ReplyAsync(msg, "All provided words are already blocked.");
+                return;
+            }
+
+            _storage.SaveBlockWords();
+            await ReplyAsync(msg, $"Added blocked words: {string.Join(' ', addedWords)}");
         }
     }
 }

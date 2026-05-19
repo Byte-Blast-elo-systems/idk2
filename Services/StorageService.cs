@@ -17,6 +17,8 @@ namespace DiscordReactionBot.Services
         public BotConfig Config { get; private set; } = new BotConfig();
         public HashSet<ulong> Allowed { get; private set; } = new HashSet<ulong>();
         public HashSet<ulong> Blocked { get; private set; } = new HashSet<ulong>();
+        public List<string> BlockWords { get; private set; } = new List<string>();
+        public List<DeletedMessageRecord> DeletedMessages { get; private set; } = new List<DeletedMessageRecord>();
         public List<Preset> Presets { get; private set; } = new List<Preset>();
         public List<ReactionRule> Reactions { get; private set; } = new List<ReactionRule>();
 
@@ -31,6 +33,8 @@ namespace DiscordReactionBot.Services
             LoadConfig();
             LoadAllowed();
             LoadBlocked();
+            LoadBlockWords();
+            LoadDeletedMessages();
             LoadPresets();
             LoadReactions();
             return Task.CompletedTask;
@@ -103,6 +107,18 @@ namespace DiscordReactionBot.Services
             Presets = LoadOrDefault("presets.json", new List<Preset>());
         }
         public void SavePresets() => SaveAtomic(Path.Combine(_dir, "presets.json"), Presets);
+
+        public void LoadBlockWords()
+        {
+            BlockWords = LoadOrDefault("blockwords.json", new List<string>());
+        }
+        public void SaveBlockWords() => SaveAtomic(Path.Combine(_dir, "blockwords.json"), BlockWords);
+
+        public void LoadDeletedMessages()
+        {
+            DeletedMessages = LoadOrDefault("deletedmessages.json", new List<DeletedMessageRecord>());
+        }
+        public void SaveDeletedMessages() => SaveAtomic(Path.Combine(_dir, "deletedmessages.json"), DeletedMessages);
 
         public void LoadReactions()
         {

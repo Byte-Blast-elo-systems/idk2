@@ -32,4 +32,14 @@ namespace DiscordReactionBot.Models
         public string Name { get; set; } = string.Empty;
         public List<string> Emojis { get; set; } = new List<string>();
     }
+
+    public class DeletedMessageRecord
+    {
+        public string Content { get; set; } = string.Empty;
+        public string AuthorTag { get; set; } = string.Empty;
+        public ulong AuthorId { get; set; }
+        public ulong ChannelId { get; set; }
+        public string ChannelName { get; set; } = string.Empty;
+        public DateTimeOffset DeletedAt { get; set; } = DateTimeOffset.UtcNow;
+    }
 }

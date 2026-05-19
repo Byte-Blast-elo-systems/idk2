@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Discord;
@@ -12,6 +13,9 @@ namespace DiscordReactionBot
         private readonly string _token;
         private readonly Services.StorageService _storage;
         private readonly Commands.CommandHandler _commands;
+        private readonly Dictionary<ulong, Models.DeletedMessageRecord> _recentMessages = new();
+        private readonly Queue<ulong> _recentMessageIds = new();
+        private const int RecentMessageCacheSize = 200;
 
         public Bot(string token)
         {
@@ -29,6 +33,7 @@ namespace DiscordReactionBot
         {
             _client.Log += LogAsync;
             _client.MessageReceived += MessageReceivedAsync;
+            _client.MessageDeleted += MessageDeletedAsync;
 
             await _storage.LoadAllAsync();
 
@@ -47,6 +52,8 @@ namespace DiscordReactionBot
         {
             if (msg.Author.IsBot) return;
 
+            StoreRecentMessage(msg);
+
             // First handle commands if message starts with prefix
             if (msg.Content.StartsWith("?"))
             {
@@ -59,6 +66,8 @@ namespace DiscordReactionBot
             if (_storage.Blocked.Contains(msg.Author.Id)) return;
 
             if (!_storage.Config.Settings.ReactEnabled) return;
+
+            if (_storage.BlockWords.Any(word => msg.Content.Contains(word, StringComparison.OrdinalIgnoreCase))) return;
 
             // Check user-specific rule
             var userRule = _storage.Reactions.FirstOrDefault(r => r.Type == Models.ReactionType.User && r.UserId == msg.Author.Id);
@@ -79,6 +88,75 @@ namespace DiscordReactionBot
                 {
                     try { await msg.AddReactionAsync(emote); } catch { }
                 }
+            }
+        }
+
+        private async Task MessageDeletedAsync(Cacheable<IMessage, ulong> cachedMessage, Cacheable<IMessageChannel, ulong> cachedChannel)
+        {
+            var messageId = cachedMessage.Id;
+            Models.DeletedMessageRecord? record = null;
+
+            var message = await cachedMessage.GetOrDownloadAsync();
+            if (message != null && message.Author != null && !message.Author.IsBot)
+            {
+                var channel = message.Channel ?? await cachedChannel.GetOrDownloadAsync();
+                record = new Models.DeletedMessageRecord
+                {
+                    Content = message.Content ?? string.Empty,
+                    AuthorTag = message.Author.ToString(),
+                    AuthorId = message.Author.Id,
+                    ChannelId = channel?.Id ?? 0ul,
+                    ChannelName = channel?.Name ?? string.Empty,
+                    DeletedAt = DateTimeOffset.UtcNow
+                };
+            }
+
+            if (record == null && _recentMessages.TryGetValue(messageId, out var recent))
+            {
+                record = new Models.DeletedMessageRecord
+                {
+                    Content = recent.Content,
+                    AuthorTag = recent.AuthorTag,
+                    AuthorId = recent.AuthorId,
+                    ChannelId = recent.ChannelId,
+                    ChannelName = recent.ChannelName,
+                    DeletedAt = DateTimeOffset.UtcNow
+                };
+            }
+
+            if (record == null)
+            {
+                Console.WriteLine($"MessageDeleted event: record not found for deleted message {messageId}");
+                return;
+            }
+
+            _storage.DeletedMessages.Insert(0, record);
+            while (_storage.DeletedMessages.Count > 10)
+            {
+                _storage.DeletedMessages.RemoveAt(_storage.DeletedMessages.Count - 1);
+            }
+            _storage.SaveDeletedMessages();
+            _recentMessages.Remove(messageId);
+        }
+
+        private void StoreRecentMessage(SocketMessage msg)
+        {
+            var record = new Models.DeletedMessageRecord
+            {
+                Content = msg.Content ?? string.Empty,
+                AuthorTag = msg.Author.ToString(),
+                AuthorId = msg.Author.Id,
+                ChannelId = msg.Channel.Id,
+                ChannelName = msg.Channel.Name,
+                DeletedAt = DateTimeOffset.MinValue
+            };
+
+            _recentMessages[msg.Id] = record;
+            _recentMessageIds.Enqueue(msg.Id);
+            while (_recentMessageIds.Count > RecentMessageCacheSize)
+            {
+                var oldestId = _recentMessageIds.Dequeue();
+                _recentMessages.Remove(oldestId);
             }
         }
     }
