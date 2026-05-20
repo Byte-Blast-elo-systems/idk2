@@ -102,7 +102,6 @@ namespace DiscordReactionBot.Commands
                         // unknown
                         break;
                 }
-            }
         }
 
         private async Task HandleFuck(SocketMessage msg)
@@ -140,6 +139,7 @@ namespace DiscordReactionBot.Commands
             if (parts[1].Equals("off", StringComparison.OrdinalIgnoreCase))
             {
                 _storage.Config.Settings.ReactEnabled = false;
+                _reactionManager.CancelCurrent();
                 _storage.SaveConfig();
                 await ReplyAsync(msg, "Reactions disabled.");
                 return;

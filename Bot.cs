@@ -100,6 +100,11 @@ namespace DiscordReactionBot
             if (ruleToApply == null) return;
 
             var cancellationToken = _reactionManager.GetToken();
+            _ = Task.Run(async () => await ReactToMessageAsync(msg, ruleToApply, cancellationToken));
+        }
+
+        private async Task ReactToMessageAsync(SocketMessage msg, Models.ReactionRule ruleToApply, CancellationToken cancellationToken)
+        {
             foreach (var token in ruleToApply.Emojis)
             {
                 if (cancellationToken.IsCancellationRequested)
