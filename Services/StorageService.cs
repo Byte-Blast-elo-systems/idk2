@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Threading.Tasks;
 using DiscordReactionBot.Models;
@@ -11,7 +12,11 @@ namespace DiscordReactionBot.Services
     public class StorageService
     {
         private readonly string _dir;
-        private readonly JsonSerializerOptions _opts = new JsonSerializerOptions { WriteIndented = true };
+        private readonly JsonSerializerOptions _opts = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = JavaScriptEncoder.Create(System.Text.Unicode.UnicodeRanges.All)
+        };
         private readonly object _fileLock = new object();
         private readonly FileSystemWatcher _watcher;
         private readonly Dictionary<string, DateTime> _lastReloadTimes = new();
@@ -66,7 +71,15 @@ namespace DiscordReactionBot.Services
             try
             {
                 var txt = File.ReadAllText(full);
-                return JsonSerializer.Deserialize<T>(txt) ?? @default;
+                var result = JsonSerializer.Deserialize<T>(txt);
+                if (result == null)
+                {
+                    SaveAtomic(full, @default);
+                    return @default;
+                }
+
+                SaveAtomic(full, result);
+                return result;
             }
             catch
             {
@@ -83,10 +96,20 @@ namespace DiscordReactionBot.Services
                 var tmp = fullPath + ".tmp";
                 var dir = Path.GetDirectoryName(fullPath) ?? _dir;
                 Directory.CreateDirectory(dir);
-                var txt = JsonSerializer.Serialize(data, _opts);
-                File.WriteAllText(tmp, txt);
-                if (File.Exists(fullPath)) File.Delete(fullPath);
-                File.Move(tmp, fullPath);
+
+                var oldEvents = _watcher.EnableRaisingEvents;
+                _watcher.EnableRaisingEvents = false;
+                try
+                {
+                    var txt = JsonSerializer.Serialize(data, _opts);
+                    File.WriteAllText(tmp, txt, new System.Text.UTF8Encoding(false));
+                    if (File.Exists(fullPath)) File.Delete(fullPath);
+                    File.Move(tmp, fullPath);
+                }
+                finally
+                {
+                    _watcher.EnableRaisingEvents = oldEvents;
+                }
             }
         }
 
