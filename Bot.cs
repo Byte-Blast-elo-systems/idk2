@@ -47,12 +47,15 @@ namespace DiscordReactionBot
 
         private string? GetCommandPrefix(string content)
         {
+            _storage.LoadConfig();
+
             var prefixes = _storage.Config.Settings.Prefixes;
             if (prefixes == null || prefixes.Count == 0) return null;
 
+            var trimmedContent = content.TrimStart();
             foreach (var prefix in prefixes.OrderByDescending(p => p.Length))
             {
-                if (!string.IsNullOrEmpty(prefix) && content.StartsWith(prefix, StringComparison.Ordinal))
+                if (!string.IsNullOrEmpty(prefix) && trimmedContent.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                     return prefix;
             }
 
@@ -69,6 +72,7 @@ namespace DiscordReactionBot
         {
             if (msg.Author.IsBot) return;
 
+            _storage.RefreshIfChanged();
             StoreRecentMessage(msg);
 
             // First handle commands if message starts with a configured prefix

@@ -23,6 +23,9 @@ namespace DiscordReactionBot.Commands
 
         public async Task HandleCommandAsync(SocketMessage msg, string prefix)
         {
+            _storage.LoadConfig();
+            _storage.RefreshIfChanged();
+
             var content = msg.Content.Trim();
             if (!content.StartsWith(prefix, StringComparison.Ordinal)) return;
 
@@ -421,21 +424,15 @@ namespace DiscordReactionBot.Commands
 
             if (action == "add")
             {
-                if (parts.Length < 3)
+                var newPrefix = string.Join(' ', parts.Skip(2)).Trim();
+                if (string.IsNullOrWhiteSpace(newPrefix))
                 {
                     await ReplyAsync(msg, "Usage: ?prefix add <prefix>");
                     return;
                 }
 
-                var newPrefix = parts[2];
-                if (string.IsNullOrWhiteSpace(newPrefix))
-                {
-                    await ReplyAsync(msg, "Prefix cannot be empty.");
-                    return;
-                }
-
                 var prefixes = _storage.Config.Settings.Prefixes;
-                if (prefixes.Contains(newPrefix))
+                if (prefixes.Any(p => p.Equals(newPrefix, StringComparison.OrdinalIgnoreCase)))
                 {
                     await ReplyAsync(msg, "That prefix is already configured.");
                     return;
@@ -449,15 +446,16 @@ namespace DiscordReactionBot.Commands
 
             if (action == "remove")
             {
-                if (parts.Length < 3)
+                var removePrefix = string.Join(' ', parts.Skip(2)).Trim();
+                if (string.IsNullOrWhiteSpace(removePrefix))
                 {
                     await ReplyAsync(msg, "Usage: ?prefix remove <prefix>");
                     return;
                 }
 
-                var removePrefix = parts[2];
                 var prefixes = _storage.Config.Settings.Prefixes;
-                if (!prefixes.Contains(removePrefix))
+                var prefixToRemove = prefixes.FirstOrDefault(p => p.Equals(removePrefix, StringComparison.OrdinalIgnoreCase));
+                if (prefixToRemove == null)
                 {
                     await ReplyAsync(msg, "That prefix is not configured.");
                     return;

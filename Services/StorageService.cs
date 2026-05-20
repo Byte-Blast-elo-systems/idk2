@@ -20,6 +20,8 @@ namespace DiscordReactionBot.Services
         private readonly object _fileLock = new object();
         private readonly FileSystemWatcher _watcher;
         private readonly Dictionary<string, DateTime> _lastReloadTimes = new();
+        private readonly Dictionary<string, (DateTime LastWrite, long Length)> _lastFileStats = new();
+        private readonly Dictionary<string, Action> _reloadActions;
 
         public BotConfig Config { get; private set; } = new BotConfig();
         public HashSet<ulong> Allowed { get; private set; } = new HashSet<ulong>();
@@ -36,7 +38,7 @@ namespace DiscordReactionBot.Services
             Directory.CreateDirectory(_dir);
             _watcher = new FileSystemWatcher(_dir, "*.json")
             {
-                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime,
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName | NotifyFilters.CreationTime,
                 EnableRaisingEvents = true,
                 IncludeSubdirectories = false
             };
@@ -45,18 +47,26 @@ namespace DiscordReactionBot.Services
             _watcher.Created += OnFileChanged;
             _watcher.Renamed += OnFileRenamed;
             _watcher.Deleted += OnFileChanged;
+
+            _reloadActions = new Dictionary<string, Action>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["botconfig.json"] = LoadConfig,
+                ["allowed.json"] = LoadAllowed,
+                ["blocked.json"] = LoadBlocked,
+                ["blockwords.json"] = LoadBlockWords,
+                ["deletedmessages.json"] = LoadDeletedMessages,
+                ["presets.json"] = LoadPresets,
+                ["reactions.json"] = LoadReactions,
+                ["rules.json"] = LoadRules
+            };
         }
 
         public Task LoadAllAsync()
         {
-            LoadConfig();
-            LoadAllowed();
-            LoadBlocked();
-            LoadBlockWords();
-            LoadDeletedMessages();
-            LoadPresets();
-            LoadReactions();
-            LoadRules();
+            foreach (var action in _reloadActions.Values)
+                action();
+
+            UpdateAllWriteTimes();
             return Task.CompletedTask;
         }
 
@@ -186,6 +196,49 @@ namespace DiscordReactionBot.Services
         }
 
         public void SaveRules() => SaveAtomic(Path.Combine(_dir, "rules.json"), Rules);
+
+        public void RefreshIfChanged()
+        {
+            lock (_fileLock)
+            {
+                foreach (var kv in _reloadActions)
+                {
+                    var full = Path.Combine(_dir, kv.Key);
+                    var info = new FileInfo(full);
+                    var currentStats = File.Exists(full)
+                        ? (info.LastWriteTimeUtc, info.Length)
+                        : (DateTime.MinValue, 0L);
+
+                    if (!_lastFileStats.TryGetValue(kv.Key, out var knownStats) || knownStats != currentStats)
+                    {
+                        try
+                        {
+                            kv.Value();
+                            _lastFileStats[kv.Key] = currentStats;
+                        }
+                        catch
+                        {
+                            // Ignore temporary invalid edits until file is valid.
+                        }
+                    }
+                }
+            }
+        }
+
+        private void UpdateAllWriteTimes()
+        {
+            lock (_fileLock)
+            {
+                foreach (var file in _reloadActions.Keys)
+                {
+                    var full = Path.Combine(_dir, file);
+                    var info = new FileInfo(full);
+                    _lastFileStats[file] = File.Exists(full)
+                        ? (info.LastWriteTimeUtc, info.Length)
+                        : (DateTime.MinValue, 0L);
+                }
+            }
+        }
 
         private void OnFileChanged(object sender, FileSystemEventArgs e)
         {
