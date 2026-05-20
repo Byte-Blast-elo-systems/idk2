@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Discord;
 using Discord.WebSocket;
@@ -12,6 +13,7 @@ namespace DiscordReactionBot
         private readonly DiscordSocketClient _client;
         private readonly string _token;
         private readonly Services.StorageService _storage;
+        private readonly Services.ReactionManager _reactionManager;
         private readonly Commands.CommandHandler _commands;
         private readonly Dictionary<ulong, Models.DeletedMessageRecord> _recentMessages = new();
         private readonly Queue<ulong> _recentMessageIds = new();
@@ -26,7 +28,8 @@ namespace DiscordReactionBot
             };
             _client = new DiscordSocketClient(config);
             _storage = new Services.StorageService("config");
-            _commands = new Commands.CommandHandler(_client, _storage);
+            _reactionManager = new Services.ReactionManager();
+            _commands = new Commands.CommandHandler(_client, _storage, _reactionManager);
         }
 
         public async Task StartAsync()
@@ -96,8 +99,12 @@ namespace DiscordReactionBot
 
             if (ruleToApply == null) return;
 
+            var cancellationToken = _reactionManager.GetToken();
             foreach (var token in ruleToApply.Emojis)
             {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
                 var emote = EmoteParser.ParseEmote(token, _client);
                 if (emote != null)
                 {

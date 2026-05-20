@@ -3,7 +3,7 @@ set -e
 
 # Restore and publish native Linux executables for x64 and ARM64.
 rm ./publish -rf
-dotnet restore
+#dotnet restore
 
 dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o ./publish/linux-x64
 

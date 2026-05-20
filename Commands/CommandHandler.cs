@@ -12,11 +12,13 @@ namespace DiscordReactionBot.Commands
     {
         private readonly DiscordSocketClient _client;
         private readonly Services.StorageService _storage;
+        private readonly Services.ReactionManager _reactionManager;
 
-        public CommandHandler(DiscordSocketClient client, Services.StorageService storage)
+        public CommandHandler(DiscordSocketClient client, Services.StorageService storage, Services.ReactionManager reactionManager)
         {
             _client = client;
             _storage = storage;
+            _reactionManager = reactionManager;
         }
 
         public async Task HandleCommandAsync(SocketMessage msg, string prefix)
@@ -24,83 +26,85 @@ namespace DiscordReactionBot.Commands
             var content = msg.Content.Trim();
             if (!content.StartsWith(prefix, StringComparison.Ordinal)) return;
 
-            var body = content[prefix.Length..].TrimStart();
-            var parts = body.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 0) return;
+                var body = content[prefix.Length..].TrimStart();
+                var parts = body.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 0) return;
 
-            var cmd = parts[0].ToLowerInvariant();
+                var cmd = parts[0].ToLowerInvariant();
 
-            // permission check for commands
-            var isAdmin = msg.Author.Id == _storage.Config.AdminId;
-            var isAllowed = _storage.Allowed.Contains(msg.Author.Id);
+                // permission check for commands
+                var isAdmin = msg.Author.Id == _storage.Config.AdminId;
+                var isAllowed = _storage.Allowed.Contains(msg.Author.Id);
 
-            if (!(isAdmin || isAllowed))
-            {
-                await ReplyAsync(msg, "holy no perms, you can't use this command.");
-                return;
-            }
+                if (!(isAdmin || isAllowed))
+                {
+                    await ReplyAsync(msg, "holy no perms, you can't use this command.");
+                    return;
+                }
 
-            switch (cmd)
-            {
-                case "ping":
-                    await ReplyAsync(msg, $"pong {_client.Latency}ms");
-                    break;
+                switch (cmd)
+                {
+                    case "ping":
+                        await ReplyAsync(msg, $"pong {_client.Latency}ms");
+                        break;
 
-                case "help":
-                    await HandleHelp(msg);
-                    break;
+                    case "help":
+                        await HandleHelp(msg);
+                        break;
 
-                case "rules":
-                    await HandleRules(msg);
-                    break;
+                    case "rules":
+                        await HandleRules(msg);
+                        break;
 
-                case "react":
-                    await HandleReact(msg, parts);
-                    break;
+                    case "react":
+                        await HandleReact(msg, parts);
+                        break;
 
-                case "preset":
-                    await HandlePreset(msg, parts);
-                    break;
+                    case "preset":
+                        await HandlePreset(msg, parts);
+                        break;
 
-                case "allow":
-                    await HandleAllow(msg);
-                    break;
+                    case "allow":
+                        await HandleAllow(msg);
+                        break;
 
-                case "remove":
-                    await HandleRemoveAllowed(msg);
-                    break;
+                    case "remove":
+                        await HandleRemoveAllowed(msg);
+                        break;
 
-                case "block":
-                    await HandleBlock(msg);
-                    break;
+                    case "block":
+                        await HandleBlock(msg);
+                        break;
 
-                case "unblock":
-                    await HandleUnblock(msg);
-                    break;
+                    case "unblock":
+                        await HandleUnblock(msg);
+                        break;
 
-                case "blockword":
-                    await HandleBlockWord(msg, parts);
-                    break;
+                    case "blockword":
+                        await HandleBlockWord(msg, parts);
+                        break;
 
-                case "snipe":
-                    await HandleSnipe(msg, parts);
-                    break;
-                case "prefix":
-                    await HandlePrefix(msg, parts);
-                    break;
+                    case "snipe":
+                        await HandleSnipe(msg, parts);
+                        break;
+                    case "prefix":
+                        await HandlePrefix(msg, parts);
+                        break;
 
-                case "hi":
-                    await HandleHi(msg);
-                    break;
-                case "fuck":
-                    await HandleFuck(msg);
-                    break;
+                    case "hi":
+                        await HandleHi(msg);
+                        break;
+                    case "fuck":
+                        await HandleFuck(msg);
+                        break;
 
-                default:
-                    // unknown
-                    break;
+                    default:
+                        // unknown
+                        break;
+                }
             }
         }
+
         private async Task HandleFuck(SocketMessage msg)
         {
             var mention = msg.Author.Mention;
@@ -136,10 +140,33 @@ namespace DiscordReactionBot.Commands
             if (parts[1].Equals("off", StringComparison.OrdinalIgnoreCase))
             {
                 _storage.Config.Settings.ReactEnabled = false;
-                _storage.Reactions.Clear();
                 _storage.SaveConfig();
+                await ReplyAsync(msg, "Reactions disabled.");
+                return;
+            }
+
+            if (parts[1].Equals("on", StringComparison.OrdinalIgnoreCase))
+            {
+                _storage.Config.Settings.ReactEnabled = true;
+                _storage.SaveConfig();
+                await ReplyAsync(msg, "Reactions enabled.");
+                return;
+            }
+
+            if (parts[1].Equals("status", StringComparison.OrdinalIgnoreCase))
+            {
+                var status = _storage.Config.Settings.ReactEnabled ? "enabled" : "disabled";
+                var globalRule = _storage.Reactions.FirstOrDefault(r => r.Type == ReactionType.Global);
+                var globalText = globalRule != null ? string.Join(' ', globalRule.Emojis) : "none";
+                await ReplyAsync(msg, $"Reactions are {status}. Global rule: {globalText}");
+                return;
+            }
+
+            if (parts[1].Equals("clear", StringComparison.OrdinalIgnoreCase))
+            {
+                _storage.Reactions.Clear();
                 _storage.SaveReactions();
-                await ReplyAsync(msg, "Reactions disabled and rules cleared.");
+                await ReplyAsync(msg, "Reaction rules cleared.");
                 return;
             }
 
@@ -250,7 +277,7 @@ namespace DiscordReactionBot.Commands
                 .WithTitle("Annyoing ahh Command Help")
                 .WithColor(Color.Green)
                 .WithDescription("Use a configured prefix for all bot commands. Admin-only commands require the configured admin user.")
-                .AddField("Reaction Rules", "`?react <emoji(s) OR preset>`\n`?react @user <emoji(s) OR preset>`\n`?react off`", true)
+                .AddField("Reaction Rules", "`?react <emoji(s) OR preset>`\n`?react @user <emoji(s) OR preset>`\n`?react on`\n`?react off`\n`?react clear`\n`?react status`", true)
                 .AddField("Presets", "`?preset add <name> <emoji(s)>`\n`?preset remove <name>`\n`?preset list`", true)
                 .AddField("Utility", "`?ping`\n`?help`\n`?rules`\n`?snipe [number]`\n`?prefix list`\n`?prefix add <prefix>`\n`?prefix remove <prefix>`", false)
                 .AddField("User Management", "`?allow @user`\n`?remove @user`\n`?block @user`\n`?unblock @user`", false)
