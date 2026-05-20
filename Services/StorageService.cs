@@ -70,6 +70,25 @@ namespace DiscordReactionBot.Services
             return Task.CompletedTask;
         }
 
+        private bool TryReadJson<T>(string path, out T? result)
+        {
+            var full = Path.Combine(_dir, path);
+            result = default;
+            if (!File.Exists(full))
+                return false;
+
+            try
+            {
+                var txt = File.ReadAllText(full);
+                result = JsonSerializer.Deserialize<T>(txt);
+                return result != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private T LoadOrDefault<T>(string path, T @default)
         {
             var full = Path.Combine(_dir, path);
@@ -78,24 +97,11 @@ namespace DiscordReactionBot.Services
                 SaveAtomic(full, @default);
                 return @default;
             }
-            try
-            {
-                var txt = File.ReadAllText(full);
-                var result = JsonSerializer.Deserialize<T>(txt);
-                if (result == null)
-                {
-                    SaveAtomic(full, @default);
-                    return @default;
-                }
 
+            if (TryReadJson<T>(path, out var result))
                 return result;
-            }
-            catch
-            {
-                // If corrupted, overwrite with default
-                SaveAtomic(full, @default);
-                return @default;
-            }
+
+            return @default;
         }
 
         private void SaveAtomic<T>(string fullPath, T data)
