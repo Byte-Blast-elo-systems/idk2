@@ -144,6 +144,14 @@ namespace DiscordReactionBot
                     AuthorId = author.Id,
                     ChannelId = channelId,
                     ChannelName = channelName,
+                    Attachments = message.Attachments
+                        .Select(a => new Models.AttachmentInfo
+                        {
+                            FileName = a.Filename,
+                            Url = a.Url,
+                            ContentType = a.ContentType ?? string.Empty
+                        })
+                        .ToList(),
                     DeletedAt = DateTimeOffset.UtcNow
                 };
             }
@@ -157,6 +165,7 @@ namespace DiscordReactionBot
                     AuthorId = recent.AuthorId,
                     ChannelId = recent.ChannelId,
                     ChannelName = recent.ChannelName,
+                    Attachments = recent.Attachments,
                     DeletedAt = DateTimeOffset.UtcNow
                 };
             }
@@ -185,6 +194,14 @@ namespace DiscordReactionBot
                 AuthorId = msg.Author.Id,
                 ChannelId = msg.Channel.Id,
                 ChannelName = msg.Channel.Name,
+                Attachments = msg.Attachments
+                    .Select(a => new Models.AttachmentInfo
+                    {
+                        FileName = a.Filename,
+                        Url = a.Url,
+                        ContentType = a.ContentType ?? string.Empty
+                    })
+                    .ToList(),
                 DeletedAt = DateTimeOffset.MinValue
             };
 

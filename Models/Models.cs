@@ -41,7 +41,15 @@ namespace DiscordReactionBot.Models
         public ulong AuthorId { get; set; }
         public ulong ChannelId { get; set; }
         public string ChannelName { get; set; } = string.Empty;
+        public List<AttachmentInfo> Attachments { get; set; } = new List<AttachmentInfo>();
         public DateTimeOffset DeletedAt { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    public class AttachmentInfo
+    {
+        public string FileName { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+        public string ContentType { get; set; } = string.Empty;
     }
 
     public class RulesConfig

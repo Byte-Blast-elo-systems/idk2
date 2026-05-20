@@ -31,6 +31,8 @@ namespace DiscordReactionBot.Commands
                 if (parts.Length == 0) return;
 
                 var cmd = parts[0].ToLowerInvariant();
+                var validCommand = cmd == "ping" || cmd == "help" || cmd == "rules" || cmd == "react" || cmd == "preset" || cmd == "allow" || cmd == "remove" || cmd == "block" || cmd == "unblock" || cmd == "blockword" || cmd == "snipe" || cmd == "prefix" || cmd == "hi" || cmd == "fuck";
+                if (!validCommand) return;
 
                 // permission check for commands
                 var isAdmin = msg.Author.Id == _storage.Config.AdminId;
@@ -164,6 +166,22 @@ namespace DiscordReactionBot.Commands
 
             if (parts[1].Equals("clear", StringComparison.OrdinalIgnoreCase))
             {
+                var targetUserId = GetTargetUserId(msg, 2);
+                if (targetUserId.HasValue)
+                {
+                    var existing = _storage.Reactions.FirstOrDefault(r => r.Type == ReactionType.User && r.UserId == targetUserId.Value);
+                    if (existing != null)
+                    {
+                        _storage.Reactions.Remove(existing);
+                        _storage.SaveReactions();
+                        await ReplyAsync(msg, $"Cleared reaction rules for <@{targetUserId.Value}>.");
+                        return;
+                    }
+
+                    await ReplyAsync(msg, $"No reaction rules found for <@{targetUserId.Value}>.");
+                    return;
+                }
+
                 _storage.Reactions.Clear();
                 _storage.SaveReactions();
                 await ReplyAsync(msg, "Reaction rules cleared.");
@@ -460,15 +478,35 @@ namespace DiscordReactionBot.Commands
         private Task ReplyWithDeletedMessageAsync(SocketMessage original, Models.DeletedMessageRecord record, int index)
         {
             var channelName = string.IsNullOrWhiteSpace(record.ChannelName) ? record.ChannelId.ToString() : record.ChannelName;
+            var description = string.IsNullOrWhiteSpace(record.Content)
+                ? (record.Attachments != null && record.Attachments.Count > 0 ? "(media only message)" : "(empty message)")
+                : record.Content;
+
             var embed = new EmbedBuilder()
                 .WithTitle($"Deleted Message #{index}")
                 .WithColor(Color.Orange)
-                .WithDescription(string.IsNullOrWhiteSpace(record.Content) ? "(empty message)" : record.Content)
+                .WithDescription(description)
                 .AddField("Author", record.AuthorTag, true)
                 .AddField("Channel", channelName, true)
                 .AddField("Deleted At", record.DeletedAt.ToString("u"), false)
                 .WithCurrentTimestamp()
                 .WithFooter(footer => footer.Text = "Annyoing ahh snipe");
+
+            if (record.Attachments != null && record.Attachments.Count > 0)
+            {
+                var attachments = record.Attachments
+                    .Select(a => $"[{a.FileName}]({a.Url})")
+                    .ToList();
+
+                embed.AddField("Attachments", string.Join("\n", attachments), false);
+
+                var firstImage = record.Attachments
+                    .FirstOrDefault(a => a.ContentType.StartsWith("image/") || a.Url.EndsWith(".png", StringComparison.OrdinalIgnoreCase) || a.Url.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || a.Url.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) || a.Url.EndsWith(".gif", StringComparison.OrdinalIgnoreCase));
+                if (firstImage != null)
+                {
+                    embed.WithImageUrl(firstImage.Url);
+                }
+            }
 
             return original.Channel.SendMessageAsync(embed: embed.Build(), messageReference: new MessageReference(original.Id), allowedMentions: AllowedMentions.None);
         }
@@ -566,7 +604,7 @@ namespace DiscordReactionBot.Commands
             else await ReplyAsync(msg, "User was not blocked.");
         }
 
-        private ulong? GetTargetUserId(SocketMessage msg)
+        private ulong? GetTargetUserId(SocketMessage msg, int partIndex = 1)
         {
             var mentioned = msg.MentionedUsers.FirstOrDefault();
             if (mentioned != null)
@@ -575,9 +613,9 @@ namespace DiscordReactionBot.Commands
             }
 
             var parts = msg.Content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length < 2) return null;
+            if (parts.Length <= partIndex) return null;
 
-            var raw = parts[1].Trim();
+            var raw = parts[partIndex].Trim();
             raw = raw.TrimStart('<', '@', '!').TrimEnd('>');
             return ulong.TryParse(raw, out var id) ? id : null;
         }
