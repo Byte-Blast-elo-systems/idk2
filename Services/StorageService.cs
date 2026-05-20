@@ -78,7 +78,6 @@ namespace DiscordReactionBot.Services
                     return @default;
                 }
 
-                SaveAtomic(full, result);
                 return result;
             }
             catch
@@ -157,6 +156,23 @@ namespace DiscordReactionBot.Services
             DeletedMessages = LoadOrDefault("deletedmessages.json", new List<DeletedMessageRecord>());
         }
         public void SaveDeletedMessages() => SaveAtomic(Path.Combine(_dir, "deletedmessages.json"), DeletedMessages);
+
+        public List<DeletedMessageRecord> ReadDeletedMessagesFromFile()
+        {
+            var full = Path.Combine(_dir, "deletedmessages.json");
+            if (!File.Exists(full))
+                return new List<DeletedMessageRecord>();
+            try
+            {
+                var txt = File.ReadAllText(full);
+                var result = JsonSerializer.Deserialize<List<DeletedMessageRecord>>(txt);
+                return result ?? new List<DeletedMessageRecord>();
+            }
+            catch
+            {
+                return new List<DeletedMessageRecord>();
+            }
+        }
 
         public void LoadReactions()
         {

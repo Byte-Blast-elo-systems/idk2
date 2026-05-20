@@ -344,13 +344,14 @@ namespace DiscordReactionBot.Commands
         {
             if (parts.Length == 1)
             {
-                if (!_storage.DeletedMessages.Any())
+                var messages = _storage.ReadDeletedMessagesFromFile();
+                if (!messages.Any())
                 {
                     await ReplyAsync(msg, "No deleted messages available.");
                     return;
                 }
 
-                var latestDeleted = _storage.DeletedMessages[0];
+                var latestDeleted = messages[0];
                 await ReplyWithDeletedMessageAsync(msg, latestDeleted, 1);
                 return;
             }
@@ -376,15 +377,17 @@ namespace DiscordReactionBot.Commands
                 return;
             }
 
-            if (index > _storage.DeletedMessages.Count)
+            var allMessages = _storage.ReadDeletedMessagesFromFile();
+            if (index > allMessages.Count)
             {
-                await ReplyAsync(msg, $"Only {_storage.DeletedMessages.Count} deleted messages are saved.", "Snipe Error", Color.Red);
+                await ReplyAsync(msg, $"Only {allMessages.Count} deleted messages are saved.", "Snipe Error", Color.Red);
                 return;
             }
 
-            var selectedDeleted = _storage.DeletedMessages[index - 1];
+            var selectedDeleted = allMessages[index - 1];
             await ReplyWithDeletedMessageAsync(msg, selectedDeleted, index);
         }
+
 
         private async Task HandlePrefix(SocketMessage msg, string[] parts)
         {
