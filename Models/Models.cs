@@ -12,6 +12,7 @@ namespace DiscordReactionBot.Models
     public class BotSettings
     {
         public bool ReactEnabled { get; set; } = true;
+        public List<string> Prefixes { get; set; } = new List<string> { "?" };
     }
 
     public enum ReactionType

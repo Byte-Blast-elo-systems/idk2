@@ -42,6 +42,20 @@ namespace DiscordReactionBot
             await _client.StartAsync();
         }
 
+        private string? GetCommandPrefix(string content)
+        {
+            var prefixes = _storage.Config.Settings.Prefixes;
+            if (prefixes == null || prefixes.Count == 0) return null;
+
+            foreach (var prefix in prefixes.OrderByDescending(p => p.Length))
+            {
+                if (!string.IsNullOrEmpty(prefix) && content.StartsWith(prefix, StringComparison.Ordinal))
+                    return prefix;
+            }
+
+            return null;
+        }
+
         private Task LogAsync(LogMessage msg)
         {
             Console.WriteLine(msg.ToString());
@@ -54,10 +68,18 @@ namespace DiscordReactionBot
 
             StoreRecentMessage(msg);
 
-            // First handle commands if message starts with prefix
-            if (msg.Content.StartsWith("?"))
+            // First handle commands if message starts with a configured prefix
+            var commandPrefix = GetCommandPrefix(msg.Content);
+            if (commandPrefix != null)
             {
-                await _commands.HandleCommandAsync(msg);
+                await _commands.HandleCommandAsync(msg, commandPrefix);
+                return;
+            }
+
+            var isAdmin = msg.Author.Id == _storage.Config.AdminId;
+            var isAllowed = _storage.Allowed.Contains(msg.Author.Id);
+            if (!isAdmin && !isAllowed)
+            {
                 return;
             }
 
@@ -99,19 +121,24 @@ namespace DiscordReactionBot
             var message = await cachedMessage.GetOrDownloadAsync();
             if (message != null && message.Author != null && !message.Author.IsBot)
             {
+                var author = message.Author!;
                 IMessageChannel? channel = message.Channel;
                 if (channel == null)
                 {
-                    channel = await cachedChannel.GetOrDownloadAsync();
+                    var fetchedChannel = await cachedChannel.GetOrDownloadAsync();
+                    channel = fetchedChannel;
                 }
+
+                var channelId = channel?.Id ?? 0ul;
+                var channelName = channel?.Name ?? string.Empty;
 
                 record = new Models.DeletedMessageRecord
                 {
                     Content = message.Content ?? string.Empty,
-                    AuthorTag = message.Author.ToString(),
-                    AuthorId = message.Author.Id,
-                    ChannelId = channel?.Id ?? 0ul,
-                    ChannelName = channel?.Name ?? string.Empty,
+                    AuthorTag = author.ToString() ?? string.Empty,
+                    AuthorId = author.Id,
+                    ChannelId = channelId,
+                    ChannelName = channelName,
                     DeletedAt = DateTimeOffset.UtcNow
                 };
             }
@@ -149,7 +176,7 @@ namespace DiscordReactionBot
             var record = new Models.DeletedMessageRecord
             {
                 Content = msg.Content ?? string.Empty,
-                AuthorTag = msg.Author.ToString(),
+                AuthorTag = msg.Author.ToString() ?? string.Empty,
                 AuthorId = msg.Author.Id,
                 ChannelId = msg.Channel.Id,
                 ChannelName = msg.Channel.Name,

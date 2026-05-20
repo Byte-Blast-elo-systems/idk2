@@ -13,6 +13,8 @@ namespace DiscordReactionBot.Services
         private readonly string _dir;
         private readonly JsonSerializerOptions _opts = new JsonSerializerOptions { WriteIndented = true };
         private readonly object _fileLock = new object();
+        private readonly FileSystemWatcher _watcher;
+        private readonly Dictionary<string, DateTime> _lastReloadTimes = new();
 
         public BotConfig Config { get; private set; } = new BotConfig();
         public HashSet<ulong> Allowed { get; private set; } = new HashSet<ulong>();
@@ -26,6 +28,17 @@ namespace DiscordReactionBot.Services
         {
             _dir = directory;
             Directory.CreateDirectory(_dir);
+            _watcher = new FileSystemWatcher(_dir, "*.json")
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime,
+                EnableRaisingEvents = true,
+                IncludeSubdirectories = false
+            };
+
+            _watcher.Changed += OnFileChanged;
+            _watcher.Created += OnFileChanged;
+            _watcher.Renamed += OnFileRenamed;
+            _watcher.Deleted += OnFileChanged;
         }
 
         public Task LoadAllAsync()
@@ -125,5 +138,58 @@ namespace DiscordReactionBot.Services
             Reactions = LoadOrDefault("reactions.json", new List<ReactionRule>());
         }
         public void SaveReactions() => SaveAtomic(Path.Combine(_dir, "reactions.json"), Reactions);
+
+        private void OnFileChanged(object sender, FileSystemEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.Name))
+                return;
+
+            var name = Path.GetFileName(e.Name);
+            if (string.IsNullOrEmpty(name))
+                return;
+
+            ReloadFileIfNeeded(name);
+        }
+
+        private void OnFileRenamed(object sender, RenamedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.Name))
+                return;
+
+            var name = Path.GetFileName(e.Name);
+            if (string.IsNullOrEmpty(name))
+                return;
+
+            ReloadFileIfNeeded(name);
+        }
+
+        private void ReloadFileIfNeeded(string fileName)
+        {
+            var now = DateTime.UtcNow;
+            lock (_fileLock)
+            {
+                if (_lastReloadTimes.TryGetValue(fileName, out var last) && (now - last).TotalMilliseconds < 250)
+                    return;
+                _lastReloadTimes[fileName] = now;
+            }
+
+            try
+            {
+                switch (fileName)
+                {
+                    case "botconfig.json": LoadConfig(); break;
+                    case "allowed.json": LoadAllowed(); break;
+                    case "blocked.json": LoadBlocked(); break;
+                    case "blockwords.json": LoadBlockWords(); break;
+                    case "deletedmessages.json": LoadDeletedMessages(); break;
+                    case "presets.json": LoadPresets(); break;
+                    case "reactions.json": LoadReactions(); break;
+                }
+            }
+            catch
+            {
+                // If the JSON is temporarily invalid while editing, ignore until it becomes valid again.
+            }
+        }
     }
 }

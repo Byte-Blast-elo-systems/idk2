@@ -19,5 +19,30 @@
       "\uD83C\uDDF4",
       "\uD83C\uDDFE"
     ]
+  },
+  {
+    "Name": "cap",
+    "Emojis": [
+      "\uD83E\uDDE2"
+    ]
+  },
+  {
+    "Name": "gay",
+    "Emojis": [
+      "\uD83C\uDDEC",
+      "\uD83C\uDDE6",
+      "\uD83C\uDDFE"
+    ]
+  },
+  {
+    "Name": "id",
+    "Emojis": [
+      "\uD83C\uDDEE",
+      "\uD83C\uDDF2",
+      "\uD83C\uDDE9",
+      "\uD83C\uDDFA",
+      "\uD83C\uDDF2",
+      "\uD83C\uDDE7"
+    ]
   }
 ]

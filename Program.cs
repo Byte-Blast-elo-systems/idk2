@@ -7,6 +7,8 @@ namespace DiscordReactionBot
     {
         public static async Task Main(string[] args)
         {
+            DotEnv.Load();
+
             var token = Environment.GetEnvironmentVariable("DISCORD_TOKEN");
             if (string.IsNullOrWhiteSpace(token))
             {

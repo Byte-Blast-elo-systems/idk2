@@ -45,6 +45,8 @@ config/*.json
 !config/blocked.json
 !config/presets.json
 !config/reactions.json
+.env
+*.env
 
 # Logs
 *.log

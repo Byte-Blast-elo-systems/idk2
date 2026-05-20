@@ -1,9 +1,39 @@
 [
   {
+    "Type": 0,
+    "UserId": null,
+    "Emojis": [
+      "1470813098213511220",
+      "cap"
+    ]
+  },
+  {
+    "Type": 1,
+    "UserId": 1323379987612565567,
+    "Emojis": [
+      "\uD83C\uDDEE",
+      "\uD83C\uDDF2",
+      "\uD83C\uDDEC",
+      "\uD83C\uDDE6",
+      "\uD83C\uDDFE"
+    ]
+  },
+  {
     "Type": 1,
     "UserId": 1470813098213511220,
     "Emojis": [
       "\uD83E\uDDE2"
+    ]
+  },
+  {
+    "Type": 1,
+    "UserId": 1273397289234202696,
+    "Emojis": [
+      "\uD83C\uDDEE",
+      "\uD83C\uDDF2",
+      "\uD83C\uDDEC",
+      "\uD83C\uDDE6",
+      "\uD83C\uDDFE"
     ]
   }
 ]

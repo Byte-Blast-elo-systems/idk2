@@ -19,20 +19,22 @@ namespace DiscordReactionBot.Commands
             _storage = storage;
         }
 
-        public async Task HandleCommandAsync(SocketMessage msg)
+        public async Task HandleCommandAsync(SocketMessage msg, string prefix)
         {
             var content = msg.Content.Trim();
-            var parts = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (!content.StartsWith(prefix, StringComparison.Ordinal)) return;
+
+            var body = content[prefix.Length..].TrimStart();
+            var parts = body.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 0) return;
 
-            var cmd = parts[0].Substring(1).ToLowerInvariant(); // remove prefix
-            if (string.IsNullOrWhiteSpace(cmd)) return;
+            var cmd = parts[0].ToLowerInvariant();
 
-            // permission check for commands (except ping)
+            // permission check for commands
             var isAdmin = msg.Author.Id == _storage.Config.AdminId;
             var isAllowed = _storage.Allowed.Contains(msg.Author.Id);
 
-            if (cmd != "ping" && !(isAdmin || isAllowed))
+            if (!(isAdmin || isAllowed))
             {
                 await ReplyAsync(msg, "holy no perms, you can't use this command.");
                 return;
@@ -79,11 +81,31 @@ namespace DiscordReactionBot.Commands
                 case "snipe":
                     await HandleSnipe(msg, parts);
                     break;
+                case "prefix":
+                    await HandlePrefix(msg, parts);
+                    break;
+
+                case "hi":
+                    await HandleHi(msg);
+                    break;
+                case "fuck":
+                    await HandleFuck(msg);
+                    break;
 
                 default:
                     // unknown
                     break;
             }
+        }
+        private async Task HandleFuck(SocketMessage msg)
+        {
+            var mention = msg.Author.Mention;
+            await ReplyAsync(msg, $"{mention} no u weirdo ", $"/warn {mention} being a weirdo", Color.Red);
+        }
+        private async Task HandleHi(SocketMessage msg)
+        {
+            var mention = msg.Author.Mention;
+            await ReplyAsync(msg, $"hi {mention}", "Hi there", Color.Green);
         }
 
         private Task ReplyAsync(SocketMessage original, string content, string title = "Annyoing ahh", Color? color = null)
@@ -96,7 +118,7 @@ namespace DiscordReactionBot.Commands
                 .WithFooter(footer => footer.Text = "Annyoing ahh — use ?help for bot commands")
                 .Build();
 
-            return original.Channel.SendMessageAsync(embed: embed, messageReference: new MessageReference(original.Id));
+            return original.Channel.SendMessageAsync(embed: embed, messageReference: new MessageReference(original.Id), allowedMentions: AllowedMentions.None);
         }
 
         private async Task HandleReact(SocketMessage msg, string[] parts)
@@ -117,15 +139,9 @@ namespace DiscordReactionBot.Commands
                 return;
             }
 
-            // check for mentioned user
-            var mentioned = msg.MentionedUsers.FirstOrDefault();
-            int startIndex = 1;
-            ulong? targetUser = null;
-            if (mentioned != null)
-            {
-                targetUser = mentioned.Id;
-                startIndex = 2;
-            }
+            // check for user mention or raw user ID
+            var targetUser = GetTargetUserId(msg);
+            var startIndex = targetUser.HasValue ? 2 : 1;
 
             if (parts.Length <= startIndex)
             {
@@ -144,7 +160,7 @@ namespace DiscordReactionBot.Commands
                 var existing = _storage.Reactions.FirstOrDefault(r => r.Type == ReactionType.User && r.UserId == targetUser.Value);
                 if (existing != null) _storage.Reactions.Remove(existing);
                 var rule = new ReactionRule { Type = ReactionType.User, UserId = targetUser.Value, Emojis = emojis };
-                _storage.Reactions.Add(rule);
+               _storage.Reactions.Add(rule);
                 _storage.SaveReactions();
                 _storage.Config.Settings.ReactEnabled = true;
                 _storage.SaveConfig();
@@ -168,7 +184,7 @@ namespace DiscordReactionBot.Commands
         {
             if (parts.Length < 2)
             {
-                await ReplyAsync(msg, "Usage: ?preset add <name> <emojis> | ?preset remove <name> | ?preset lis");
+                await ReplyAsync(msg, "Usage: ?preset add <name> <emojis> | ?preset remove <name> | ?preset list");
                 return;
             }
             var op = parts[1].ToLowerInvariant();
@@ -220,7 +236,7 @@ namespace DiscordReactionBot.Commands
             }
             else
             {
-                await ReplyAsync(msg, "Usage: ?preset add <name> <emojis> | ?preset remove <name> | ?preset lis");
+                await ReplyAsync(msg, "Usage: ?preset add <name> <emojis> | ?preset remove <name> | ?preset list");
             }
         }
 
@@ -228,17 +244,18 @@ namespace DiscordReactionBot.Commands
         {
             var embed = new EmbedBuilder()
                 .WithTitle("Annyoing ahh Command Help")
-                .WithColor(Color.Gold)
-                .WithDescription("Use the `?` prefix for all bot commands. Admin only commands require the configured admin user.")
+                .WithColor(Color.Green)
+                .WithDescription("Use a configured prefix for all bot commands. Admin-only commands require the configured admin user.")
                 .AddField("Reaction Rules", "`?react <emoji(s) OR preset>`\n`?react @user <emoji(s) OR preset>`\n`?react off`", true)
-                .AddField("Presets", "`?preset add <name> <emoji(s)>`\n`?preset remove <name>`\n`?preset lis`", true)
-                .AddField("Utility", "`?ping`\n`?help`\n`?snipe [number]`\n`?snipe clear` (admin only)", false)
+                .AddField("Presets", "`?preset add <name> <emoji(s)>`\n`?preset remove <name>`\n`?preset list`", true)
+                .AddField("Utility", "`?ping`\n`?help`\n`?snipe [number]`\n`?prefix list`\n`?prefix add <prefix>`\n`?prefix remove <prefix>`", false)
                 .AddField("User Management", "`?allow @user`\n`?remove @user`\n`?block @user`\n`?unblock @user`", false)
                 .AddField("Safety", "`?blockword <word1> <word2> ...`", false)
+                .AddField("Fun", "`?hi`\n`?fuck <user>`", false)
                 .WithCurrentTimestamp()
                 .WithFooter(footer => footer.Text = "Annyoing ahh help");
 
-            await msg.Channel.SendMessageAsync(embed: embed.Build(), messageReference: new MessageReference(msg.Id));
+            await msg.Channel.SendMessageAsync(embed: embed.Build(), messageReference: new MessageReference(msg.Id), allowedMentions: AllowedMentions.None);
         }
 
         private async Task HandleSnipe(SocketMessage msg, string[] parts)
@@ -287,6 +304,95 @@ namespace DiscordReactionBot.Commands
             await ReplyWithDeletedMessageAsync(msg, selectedDeleted, index);
         }
 
+        private async Task HandlePrefix(SocketMessage msg, string[] parts)
+        {
+            if (msg.Author.Id != _storage.Config.AdminId)
+            {
+                await ReplyAsync(msg, "holy no perms, prefix config is admin-only.", "Nope", Color.Red);
+                return;
+            }
+
+            if (parts.Length < 2)
+            {
+                await ReplyAsync(msg, "Usage: ?prefix list | ?prefix add <prefix> | ?prefix remove <prefix>");
+                return;
+            }
+
+            var action = parts[1].ToLowerInvariant();
+            if (action == "list")
+            {
+                var prefixes = _storage.Config.Settings.Prefixes;
+                if (prefixes == null || prefixes.Count == 0)
+                {
+                    await ReplyAsync(msg, "No prefixes configured.");
+                    return;
+                }
+
+                var lines = prefixes.Select(p => $"- {p}");
+                var message = "Current prefixes:\n" + string.Join("\n", lines);
+                await ReplyAsync(msg, message, "Prefix List", Color.Purple);
+                return;
+            }
+
+            if (action == "add")
+            {
+                if (parts.Length < 3)
+                {
+                    await ReplyAsync(msg, "Usage: ?prefix add <prefix>");
+                    return;
+                }
+
+                var newPrefix = parts[2];
+                if (string.IsNullOrWhiteSpace(newPrefix))
+                {
+                    await ReplyAsync(msg, "Prefix cannot be empty.");
+                    return;
+                }
+
+                var prefixes = _storage.Config.Settings.Prefixes;
+                if (prefixes.Contains(newPrefix))
+                {
+                    await ReplyAsync(msg, "That prefix is already configured.");
+                    return;
+                }
+
+                prefixes.Add(newPrefix);
+                _storage.SaveConfig();
+                await ReplyAsync(msg, $"Added prefix {newPrefix}.", "Prefix Added", Color.Green);
+                return;
+            }
+
+            if (action == "remove")
+            {
+                if (parts.Length < 3)
+                {
+                    await ReplyAsync(msg, "Usage: ?prefix remove <prefix>");
+                    return;
+                }
+
+                var removePrefix = parts[2];
+                var prefixes = _storage.Config.Settings.Prefixes;
+                if (!prefixes.Contains(removePrefix))
+                {
+                    await ReplyAsync(msg, "That prefix is not configured.");
+                    return;
+                }
+
+                if (prefixes.Count == 1)
+                {
+                    await ReplyAsync(msg, "Cannot remove the last prefix.");
+                    return;
+                }
+
+                prefixes.Remove(removePrefix);
+                _storage.SaveConfig();
+                await ReplyAsync(msg, $"Removed prefix {removePrefix}.", "Prefix Removed", Color.Orange);
+                return;
+            }
+
+            await ReplyAsync(msg, "Usage: ?prefix list | ?prefix add <prefix> | ?prefix remove <prefix>");
+        }
+
         private Task ReplyWithDeletedMessageAsync(SocketMessage original, Models.DeletedMessageRecord record, int index)
         {
             var channelName = string.IsNullOrWhiteSpace(record.ChannelName) ? record.ChannelId.ToString() : record.ChannelName;
@@ -298,9 +404,9 @@ namespace DiscordReactionBot.Commands
                 .AddField("Channel", channelName, true)
                 .AddField("Deleted At", record.DeletedAt.ToString("u"), false)
                 .WithCurrentTimestamp()
-                .WithFooter(footer => footer.Text = "Use ?snipe clear to clear history");
+                .WithFooter(footer => footer.Text = "Annyoing ahh snipe");
 
-            return original.Channel.SendMessageAsync(embed: embed.Build(), messageReference: new MessageReference(original.Id));
+            return original.Channel.SendMessageAsync(embed: embed.Build(), messageReference: new MessageReference(original.Id), allowedMentions: AllowedMentions.None);
         }
 
         private async Task HandleAllow(SocketMessage msg)
@@ -311,19 +417,19 @@ namespace DiscordReactionBot.Commands
                 await ReplyAsync(msg, "ur to dumb to allow people");
                 return;
             }
-            var mentioned = msg.MentionedUsers.FirstOrDefault();
-            if (mentioned == null)
+            var targetUserId = GetTargetUserId(msg);
+            if (!targetUserId.HasValue)
             {
-                await ReplyAsync(msg, "Mention a user to allow.");
+                await ReplyAsync(msg, "Mention a user or provide a user ID to allow.");
                 return;
             }
-            if (!_storage.Allowed.Add(mentioned.Id))
+            if (!_storage.Allowed.Add(targetUserId.Value))
             {
                 await ReplyAsync(msg, "User already allowed.");
                 return;
             }
             _storage.SaveAllowed();
-            await ReplyAsync(msg, $"Allowed <@{mentioned.Id}> to use commands.");
+            await ReplyAsync(msg, $"Allowed <@{targetUserId.Value}> to use commands.");
         }
 
         private async Task HandleRemoveAllowed(SocketMessage msg)
@@ -334,21 +440,21 @@ namespace DiscordReactionBot.Commands
                 await ReplyAsync(msg, "holy dumb ahh only admin can remove allowed users");
                 return;
             }
-            var mentioned = msg.MentionedUsers.FirstOrDefault();
-            if (mentioned == null)
+            var targetUserId = GetTargetUserId(msg);
+            if (!targetUserId.HasValue)
             {
-                await ReplyAsync(msg, "Mention a user to remove.");
+                await ReplyAsync(msg, "Mention a user or provide a user ID to remove.");
                 return;
             }
-            if (mentioned.Id == _storage.Config.AdminId)
+            if (targetUserId.Value == _storage.Config.AdminId)
             {
                 await ReplyAsync(msg, "can't unallow the admin dummy");
                 return;
             }
-            if (_storage.Allowed.Remove(mentioned.Id))
+            if (_storage.Allowed.Remove(targetUserId.Value))
             {
                 _storage.SaveAllowed();
-                await ReplyAsync(msg, $"Removed <@{mentioned.Id}> from allowed users.");
+                await ReplyAsync(msg, $"Removed <@{targetUserId.Value}> from allowed users.");
             }
             else await ReplyAsync(msg, "User was not in allowed list.");
         }
@@ -360,19 +466,19 @@ namespace DiscordReactionBot.Commands
                 await ReplyAsync(msg, "holy no perms");
                 return;
             }
-            var mentioned = msg.MentionedUsers.FirstOrDefault();
-            if (mentioned == null)
+            var targetUserId = GetTargetUserId(msg);
+            if (!targetUserId.HasValue)
             {
-                await ReplyAsync(msg, "Mention a user to block.");
+                await ReplyAsync(msg, "Mention a user or provide a user ID to block.");
                 return;
             }
-            if (!_storage.Blocked.Add(mentioned.Id))
+            if (!_storage.Blocked.Add(targetUserId.Value))
             {
                 await ReplyAsync(msg, "User already blocked.");
                 return;
             }
             _storage.SaveBlocked();
-            await ReplyAsync(msg, $"Blocked <@{mentioned.Id}>.");
+            await ReplyAsync(msg, $"Blocked <@{targetUserId.Value}>.");
         }
 
         private async Task HandleUnblock(SocketMessage msg)
@@ -382,18 +488,34 @@ namespace DiscordReactionBot.Commands
                 await ReplyAsync(msg, "holy no perms");
                 return;
             }
-            var mentioned = msg.MentionedUsers.FirstOrDefault();
-            if (mentioned == null)
+            var targetUserId = GetTargetUserId(msg);
+            if (!targetUserId.HasValue)
             {
-                await ReplyAsync(msg, "Mention a user to unblock.");
+                await ReplyAsync(msg, "Mention a user or provide a user ID to unblock.");
                 return;
             }
-            if (_storage.Blocked.Remove(mentioned.Id))
+            if (_storage.Blocked.Remove(targetUserId.Value))
             {
                 _storage.SaveBlocked();
-                await ReplyAsync(msg, $"Unblocked <@{mentioned.Id}>.");
+                await ReplyAsync(msg, $"Unblocked <@{targetUserId.Value}>.");
             }
             else await ReplyAsync(msg, "User was not blocked.");
+        }
+
+        private ulong? GetTargetUserId(SocketMessage msg)
+        {
+            var mentioned = msg.MentionedUsers.FirstOrDefault();
+            if (mentioned != null)
+            {
+                return mentioned.Id;
+            }
+
+            var parts = msg.Content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2) return null;
+
+            var raw = parts[1].Trim();
+            raw = raw.TrimStart('<', '@', '!').TrimEnd('>');
+            return ulong.TryParse(raw, out var id) ? id : null;
         }
 
         private async Task HandleBlockWord(SocketMessage msg, string[] parts)
