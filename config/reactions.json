@@ -1,24 +1,5 @@
 [
   {
-    "Type": 0,
-    "UserId": null,
-    "Emojis": [
-      "1470813098213511220",
-      "cap"
-    ]
-  },
-  {
-    "Type": 1,
-    "UserId": 1323379987612565567,
-    "Emojis": [
-      "\uD83C\uDDEE",
-      "\uD83C\uDDF2",
-      "\uD83C\uDDEC",
-      "\uD83C\uDDE6",
-      "\uD83C\uDDFE"
-    ]
-  },
-  {
     "Type": 1,
     "UserId": 1470813098213511220,
     "Emojis": [
@@ -33,6 +14,18 @@
       "\uD83C\uDDF2",
       "\uD83C\uDDEC",
       "\uD83C\uDDE6",
+      "\uD83C\uDDFE"
+    ]
+  },
+  {
+    "Type": 1,
+    "UserId": 1055132673699483728,
+    "Emojis": [
+      "\uD83C\uDDEB",
+      "\uD83C\uDDEA",
+      "\uD83C\uDDF2",
+      "\uD83C\uDDE7",
+      "\uD83C\uDDF4",
       "\uD83C\uDDFE"
     ]
   }

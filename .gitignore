@@ -68,8 +68,8 @@ config/*.json
 # Optional npm cache files
 node_modules/
 
-# config folders
+# config 
 config/
-
+*.json
 # zip
 *.zip
