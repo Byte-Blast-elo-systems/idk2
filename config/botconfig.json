@@ -1,7 +1,7 @@
 {
   "AdminId": 1084859798740279407,
   "Settings": {
-    "ReactEnabled": true,
+    "ReactEnabled": false,
     "Prefixes": [
       "?"
     ]

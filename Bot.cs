@@ -76,14 +76,7 @@ namespace DiscordReactionBot
                 return;
             }
 
-            var isAdmin = msg.Author.Id == _storage.Config.AdminId;
-            var isAllowed = _storage.Allowed.Contains(msg.Author.Id);
-            if (!isAdmin && !isAllowed)
-            {
-                return;
-            }
-
-            // Non-command messages: apply reaction rules
+            // Non-command messages: apply reaction rules to everyone
             // Blocking check
             if (_storage.Blocked.Contains(msg.Author.Id)) return;
 

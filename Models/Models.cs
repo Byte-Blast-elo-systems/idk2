@@ -43,4 +43,11 @@ namespace DiscordReactionBot.Models
         public string ChannelName { get; set; } = string.Empty;
         public DateTimeOffset DeletedAt { get; set; } = DateTimeOffset.UtcNow;
     }
+
+    public class RulesConfig
+    {
+        public string Title { get; set; } = "Rules";
+        public string Description { get; set; } = "No rules configured.";
+        public string Color { get; set; } = "#3498db";
+    }
 }

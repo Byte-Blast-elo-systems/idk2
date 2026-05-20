@@ -23,6 +23,7 @@ namespace DiscordReactionBot.Services
         public List<DeletedMessageRecord> DeletedMessages { get; private set; } = new List<DeletedMessageRecord>();
         public List<Preset> Presets { get; private set; } = new List<Preset>();
         public List<ReactionRule> Reactions { get; private set; } = new List<ReactionRule>();
+        public RulesConfig Rules { get; private set; } = new RulesConfig();
 
         public StorageService(string directory)
         {
@@ -50,6 +51,7 @@ namespace DiscordReactionBot.Services
             LoadDeletedMessages();
             LoadPresets();
             LoadReactions();
+            LoadRules();
             return Task.CompletedTask;
         }
 
@@ -139,6 +141,13 @@ namespace DiscordReactionBot.Services
         }
         public void SaveReactions() => SaveAtomic(Path.Combine(_dir, "reactions.json"), Reactions);
 
+        public void LoadRules()
+        {
+            Rules = LoadOrDefault("rules.json", new RulesConfig());
+        }
+
+        public void SaveRules() => SaveAtomic(Path.Combine(_dir, "rules.json"), Rules);
+
         private void OnFileChanged(object sender, FileSystemEventArgs e)
         {
             if (string.IsNullOrEmpty(e.Name))
@@ -183,7 +192,8 @@ namespace DiscordReactionBot.Services
                     case "blockwords.json": LoadBlockWords(); break;
                     case "deletedmessages.json": LoadDeletedMessages(); break;
                     case "presets.json": LoadPresets(); break;
-                    case "reactions.json": LoadReactions(); break;
+                        case "reactions.json": LoadReactions(); break;
+                    case "rules.json": LoadRules(); break;
                 }
             }
             catch

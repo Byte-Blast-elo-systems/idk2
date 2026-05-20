@@ -50,6 +50,10 @@ namespace DiscordReactionBot.Commands
                     await HandleHelp(msg);
                     break;
 
+                case "rules":
+                    await HandleRules(msg);
+                    break;
+
                 case "react":
                     await HandleReact(msg, parts);
                     break;
@@ -248,7 +252,7 @@ namespace DiscordReactionBot.Commands
                 .WithDescription("Use a configured prefix for all bot commands. Admin-only commands require the configured admin user.")
                 .AddField("Reaction Rules", "`?react <emoji(s) OR preset>`\n`?react @user <emoji(s) OR preset>`\n`?react off`", true)
                 .AddField("Presets", "`?preset add <name> <emoji(s)>`\n`?preset remove <name>`\n`?preset list`", true)
-                .AddField("Utility", "`?ping`\n`?help`\n`?snipe [number]`\n`?prefix list`\n`?prefix add <prefix>`\n`?prefix remove <prefix>`", false)
+                .AddField("Utility", "`?ping`\n`?help`\n`?rules`\n`?snipe [number]`\n`?prefix list`\n`?prefix add <prefix>`\n`?prefix remove <prefix>`", false)
                 .AddField("User Management", "`?allow @user`\n`?remove @user`\n`?block @user`\n`?unblock @user`", false)
                 .AddField("Safety", "`?blockword <word1> <word2> ...`", false)
                 .AddField("Fun", "`?hi`\n`?fuck <user>`", false)
@@ -256,6 +260,39 @@ namespace DiscordReactionBot.Commands
                 .WithFooter(footer => footer.Text = "Annyoing ahh help");
 
             await msg.Channel.SendMessageAsync(embed: embed.Build(), messageReference: new MessageReference(msg.Id), allowedMentions: AllowedMentions.None);
+        }
+
+        private async Task HandleRules(SocketMessage msg)
+        {
+            var rules = _storage.Rules;
+            var color = ParseRuleColor(rules.Color);
+
+            var embed = new EmbedBuilder()
+                .WithTitle(string.IsNullOrWhiteSpace(rules.Title) ? "Rules" : rules.Title)
+                .WithDescription(string.IsNullOrWhiteSpace(rules.Description) ? "No rules configured." : rules.Description)
+                .WithColor(color)
+                .WithCurrentTimestamp()
+                .WithFooter(footer => footer.Text = "Server Rules");
+
+            await msg.Channel.SendMessageAsync(
+                embed: embed.Build(),
+                allowedMentions: AllowedMentions.None
+            );
+        }
+
+        private Color ParseRuleColor(string color)
+        {
+            if (string.IsNullOrWhiteSpace(color))
+                return Color.Blue;
+
+            var trimmed = color.Trim();
+            if (trimmed.StartsWith("#"))
+                trimmed = trimmed[1..];
+
+            if (trimmed.Length == 6 && int.TryParse(trimmed, System.Globalization.NumberStyles.HexNumber, null, out var rgb))
+                return new Color((uint)rgb);
+
+            return Color.Blue;
         }
 
         private async Task HandleSnipe(SocketMessage msg, string[] parts)
